@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>P2P Chat</title>
-    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #111; color: #eee; font-family: Arial, sans-serif; height: 100vh; display: flex; justify-content: center; align-items: center; }
@@ -25,7 +25,6 @@
         #sideHead { padding: 12px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 10px; }
         #myAv { width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; background: #0af; flex-shrink: 0; }
         #myNm { font-size: 14px; font-weight: bold; color: #0af; }
-        #myId { font-size: 10px; color: #666; cursor: pointer; display: none; }
         #newBtn { margin: 10px 12px; background: #0a6; color: #fff; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
         #chats { flex: 1; overflow-y: auto; }
         .ci { padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #222; }
@@ -35,52 +34,46 @@
         .ci-name { font-size: 13px; font-weight: bold; }
         .ci-last { font-size: 11px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .unread { background: #0af; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; }
-        .dot-on { width: 7px; height: 7px; background: #0a6; border-radius: 50%; }
-        .dot-off { width: 7px; height: 7px; background: #444; border-radius: 50%; }
         #main { flex: 1; display: none; flex-direction: column; }
         #mHead { padding: 10px 15px; background: #1e1e1e; border-bottom: 1px solid #333; display: none; align-items: center; gap: 10px; }
         #mAv { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; background: #333; }
         #mName { font-size: 14px; font-weight: bold; }
-        #mStat { font-size: 11px; color: #666; }
+        #mRoom { font-size: 10px; color: #666; cursor: pointer; }
         #msgs { flex: 1; overflow-y: auto; padding: 15px; display: none; flex-direction: column; gap: 8px; }
         #msgs::-webkit-scrollbar { width: 5px; } #msgs::-webkit-scrollbar-thumb { background: #444; }
         .m { max-width: 65%; padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.4; word-wrap: break-word; }
         .m-me { align-self: flex-end; background: #0af; color: #fff; border-bottom-right-radius: 2px; }
         .m-them { align-self: flex-start; background: #2a2a2a; color: #ddd; border-bottom-left-radius: 2px; }
+        .m-name { font-size: 10px; color: #aaa; margin-bottom: 2px; }
         .m-time { font-size: 9px; color: #aaa; margin-top: 3px; } .m-me .m-time { text-align: right; }
         .m img { max-width: 250px; max-height: 200px; border-radius: 6px; margin-top: 4px; cursor: pointer; }
         .m video { max-width: 250px; max-height: 200px; border-radius: 6px; margin-top: 4px; }
         .m audio { margin-top: 4px; width: 200px; }
         .fl { display: inline-block; background: rgba(255,255,255,0.1); padding: 6px 10px; border-radius: 6px; margin-top: 4px; color: #0cf; text-decoration: none; font-size: 12px; }
-        .fl:hover { background: rgba(255,255,255,0.2); }
         #empty { flex: 1; display: flex; justify-content: center; align-items: center; color: #444; font-size: 16px; }
         #inputBar { padding: 10px 15px; background: #1e1e1e; border-top: 1px solid #333; display: none; gap: 8px; }
         #msgIn { flex: 1; background: #222; border: 1px solid #444; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; resize: none; height: 38px; }
         #msgIn:focus { border-color: #0af; }
         #fileIn { display: none; }
         .btn-file { background: #a0f; padding: 8px 10px; font-size: 16px; }
-        #typing { color: #0af; font-size: 11px; padding: 2px 15px; min-height: 16px; font-style: italic; }
         #modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
         .mod { background: #1e1e1e; padding: 20px; border-radius: 8px; width: 300px; }
         .mod h3 { margin-bottom: 12px; color: #0af; font-size: 16px; }
-        .mod input, .mod textarea { width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; margin-bottom: 8px; }
-        .mod textarea { resize: none; height: 60px; font-family: Arial, sans-serif; }
+        .mod input { width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; margin-bottom: 8px; }
         .mod-btns { display: flex; gap: 8px; justify-content: flex-end; }
         #preview { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 200; justify-content: center; align-items: center; cursor: pointer; }
         #preview img { max-width: 90%; max-height: 90%; }
-        #requests { border-bottom: 1px solid #333; }
-        .req { padding: 10px 12px; display: flex; align-items: center; gap: 8px; background: #1a1a2a; border-bottom: 1px solid #222; }
-        .req-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; background: #333; flex-shrink: 0; }
-        .req-info { flex: 1; }
-        .req-name { font-size: 13px; font-weight: bold; color: #f0a030; }
-        .req-msg { font-size: 11px; color: #aaa; margin-top: 2px; font-style: italic; }
-        .req-btns { display: flex; gap: 5px; }
+        #status { position: fixed; top: 5px; right: 5px; font-size: 10px; padding: 3px 8px; border-radius: 4px; z-index: 1000; }
+        .st-ok { background: #0a6; color: #fff; }
+        .st-err { background: #d44; color: #fff; }
+        .st-wait { background: #a60; color: #fff; }
     </style>
 </head>
 <body>
     <div id="app">
         <div id="setup">
             <h1>P2P Chat</h1>
+            <p style="color:#888;font-size:13px;margin-bottom:10px">Kostenlos, kein Account nötig</p>
             <div id="avatars"></div>
             <input type="text" id="nameIn" placeholder="Dein Name" maxlength="20">
             <button class="btn" id="startBtn">Starten</button>
@@ -88,17 +81,15 @@
         <div id="sidebar">
             <div id="sideHead">
                 <div id="myAv"></div>
-                <div><div id="myNm"></div><div id="myId" title="Klicken zum Kopieren"></div></div>
+                <div><div id="myNm"></div></div>
             </div>
             <button id="newBtn" onclick="openModal()">+ Neuer Chat</button>
-            <div id="requests"></div>
             <div id="chats"></div>
         </div>
         <div id="main">
-            <div id="mHead"><div id="mAv"></div><div><div id="mName"></div><div id="mStat"></div></div><button class="btn btn-small btn-red" onclick="delChat()" style="margin-left:auto">X</button></div>
+            <div id="mHead"><div id="mAv"></div><div><div id="mName"></div><div id="mRoom" title="Klicken zum Kopieren"></div></div><button class="btn btn-small btn-red" onclick="delChat()" style="margin-left:auto">X</button></div>
             <div id="empty">Chat auswaehlen</div>
             <div id="msgs"></div>
-            <div id="typing"></div>
             <div id="inputBar">
                 <input type="file" id="fileIn">
                 <button class="btn btn-file" onclick="document.getElementById('fileIn').click()">&#128206;</button>
@@ -109,23 +100,23 @@
         <div id="modal">
             <div class="mod">
                 <h3>Neuer Chat</h3>
-                <input type="text" id="modalPeer" placeholder="Name oder Peer ID">
-                <input type="text" id="modalName" placeholder="Name (optional)">
-                <textarea id="modalMsg" placeholder="Nachricht (optional)"></textarea>
-                <div class="mod-btns"><button class="btn btn-small" onclick="closeModal()">Abbrechen</button><button class="btn btn-small btn-green" onclick="addChat()">Verbinden</button></div>
+                <input type="text" id="modalRoom" placeholder="Raum-Code (z.B. abc123)">
+                <div class="mod-btns"><button class="btn btn-small" onclick="closeModal()">Abbrechen</button><button class="btn btn-small btn-green" onclick="joinRoom()">Beitreten</button></div>
             </div>
         </div>
         <div id="preview" onclick="this.style.display='none'"><img></div>
     </div>
+    <div id="status" class="st-wait">Verbinde...</div>
 
     <script>
         const COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e91e63','#00bcd4','#8bc34a'];
-        let peer, myId, myName, myAv;
-        let chats = {}, active = null, conns = {};
-        let requests = {}, pendingConns = {};
+        let sb, myName, myAv, myId;
+        let chats = {}, active = null, channels = {};
 
         function gs(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
         function ss(k, v) { localStorage.setItem(k, JSON.stringify(v)) }
+
+        function genId() { return Math.random().toString(36).substr(2, 9); }
 
         function initAv() {
             const el = document.getElementById('avatars'); el.innerHTML = '';
@@ -138,137 +129,76 @@
             }
         }
 
+        async function initSupabase() {
+            const status = document.getElementById('status');
+            try {
+                console.log('Supabase wird initialisiert...');
+                sb = window.supabase.createClient(
+                    'https://jrhzqntlihqdwjuvefow.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpyaHpxbnRsaWhxZHdqdXZlZm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MzE3NzAsImV4cCI6MjEwMDMwNzc3MH0.dGGxrVBHN3rCWDRjY7lMnNN5tb_vpfJpHA7olLageBU'
+                );
+                console.log('Supabase Client erstellt');
+                status.textContent = 'Verbunden';
+                status.className = 'st-ok';
+                return true;
+            } catch(e) {
+                console.error('Supabase Fehler:', e);
+                status.textContent = 'Fehler: ' + e.message;
+                status.className = 'st-err';
+                return false;
+            }
+        }
+
         function start() {
+            console.log('Start geklickt');
             myName = document.getElementById('nameIn').value.trim();
             const sel = document.querySelector('.av.sel');
+            console.log('Name:', myName, 'Avatar:', sel ? sel.textContent : 'keiner');
             if (!myName) { alert('Name eingeben'); return; }
             if (!sel) { alert('Avatar waehlen'); return; }
             myAv = sel.textContent;
-            ss('c_name', myName); ss('c_av', myAv); go();
+            myId = genId();
+            ss('c_name', myName); ss('c_av', myAv); ss('c_id', myId);
+            go();
         }
 
-        function go() {
+        async function go() {
+            console.log('go() aufgerufen');
             document.getElementById('setup').style.display = 'none';
             document.getElementById('sidebar').style.display = 'flex';
             document.getElementById('main').style.display = 'flex';
             document.getElementById('myNm').textContent = myName;
             document.getElementById('myAv').textContent = myAv;
             document.getElementById('myAv').style.background = COLORS[myAv.charCodeAt(0) - 65] || '#333';
-            chats = gs('c_chats', {}); requests = gs('c_reqs', {});
-            renderList(); renderReqs(); initPeer();
+            chats = gs('c_chats', {});
+            renderList();
+            console.log('Supabase wird initialisiert...');
+            await initSupabase();
+            console.log('Supabase initialisiert');
         }
 
-        function setupConn(c) {
-            const pid = c.peer;
-            c.on('data', d => {
-                if (d.t === 'info') {
-                    if (chats[pid]) {
-                        chats[pid].name = d.n; chats[pid].av = d.a; chats[pid].on = true;
-                        conns[pid] = c; save(); renderList();
-                        c.send({ t: 'accepted' });
-                        if (active === pid) open(pid);
-                    } else if (requests[pid]) {
-                        pendingConns[pid] = c;
-                    } else {
-                        requests[pid] = { id: pid, name: d.n, av: d.a, msg: d.msg || '', time: Date.now() };
-                        pendingConns[pid] = c; ss('c_reqs', requests); renderReqs();
-                        c.send({ t: 'request', n: myName, a: myAv, msg: '' });
-                    }
-                } else if (d.t === 'request') {
-                    if (!chats[pid] && !requests[pid]) {
-                        requests[pid] = { id: pid, name: d.n, av: d.a, msg: d.msg || '', time: Date.now() };
-                        pendingConns[pid] = c; ss('c_reqs', requests); renderReqs();
-                    }
-                } else if (d.t === 'accepted') {
-                    if (chats[pid]) { chats[pid].on = true; save(); renderList(); open(pid); }
-                } else if (d.t === 'msg') {
-                    addMsg(pid, d.text, false);
-                } else if (d.t === 'file') {
-                    addMsg(pid, '', false, d);
-                } else if (d.t === 'typing') {
-                    showTyping();
-                }
-            });
-            c.on('close', () => {
-                if (chats[pid]) { chats[pid].on = false; save(); renderList(); }
-                delete conns[pid]; delete pendingConns[pid];
-            });
-        }
-
-        function initPeer() {
-            peer = new Peer();
-            peer.on('open', id => { myId = id; document.getElementById('myId').textContent = 'ID: ' + id; });
-            peer.on('connection', c => {
-                c.on('open', () => c.send({ t: 'info', n: myName, a: myAv, msg: '' }));
-                setupConn(c);
-            });
-        }
-
-        function acceptReq(pid) {
-            const req = requests[pid]; if (!req) return;
-            chats[pid] = { id: pid, name: req.name, av: req.av, msgs: [], last: '', time: Date.now(), un: 0, on: false };
-            if (req.msg) {
-                chats[pid].msgs.push({ text: req.msg, me: false, time: Date.now(), file: null });
-                chats[pid].last = req.msg;
+        function joinRoom() {
+            const code = document.getElementById('modalRoom').value.trim().toLowerCase();
+            if (!code) return;
+            closeModal();
+            if (!chats[code]) {
+                chats[code] = { room: code, name: 'Raum ' + code, msgs: [], last: '', time: Date.now(), un: 0 };
+                ss('c_chats', chats); renderList();
             }
-            delete requests[pid]; ss('c_reqs', requests); save(); renderList(); renderReqs();
-            const c = pendingConns[pid];
-            if (c && c.open) {
-                conns[pid] = c; c.send({ t: 'accepted' });
-                chats[pid].on = true; save(); renderList();
-            }
-            delete pendingConns[pid]; open(pid);
+            subscribeRoom(code);
+            open(code);
         }
 
-        function rejectReq(pid) {
-            const c = pendingConns[pid]; if (c) c.close();
-            delete pendingConns[pid]; delete requests[pid];
-            ss('c_reqs', requests); renderReqs();
-        }
-
-        function connect(pid, name, msg) {
-            const c = peer.connect(pid, { reliable: true });
-            c.on('open', () => {
-                c.send({ t: 'info', n: myName, a: myAv, msg: msg || '' });
-                conns[pid] = c;
-                if (!chats[pid]) {
-                    chats[pid] = { id: pid, name: name || pid, av: '?', msgs: [], last: '', time: Date.now(), un: 0, on: true };
-                } else { chats[pid].on = true; }
-                save(); renderList(); open(pid);
+        function subscribeRoom(room) {
+            if (channels[room]) return;
+            const ch = sb.channel('chat-' + room, { config: { broadcast: { self: false } } });
+            ch.on('broadcast', { event: 'msg' }, payload => {
+                const d = payload.payload;
+                if (d.uid === myId) return;
+                addMsg(room, d.text, false, d.name, d.av, d.file);
             });
-            setupConn(c);
-        }
-
-        function addMsg(pid, text, me, file) {
-            if (!chats[pid]) return;
-            chats[pid].msgs.push({ text, me, time: Date.now(), file });
-            chats[pid].last = text || (file ? 'Datei' : '');
-            chats[pid].time = Date.now();
-            if (!me && active !== pid) chats[pid].un = (chats[pid].un || 0) + 1;
-            save(); renderList(); if (active === pid) renderMsgs();
-        }
-
-        function save() { ss('c_chats', chats); }
-
-        function renderReqs() {
-            const el = document.getElementById('requests'); el.innerHTML = '';
-            Object.values(requests).forEach(r => {
-                const d = document.createElement('div'); d.className = 'req';
-                const col = COLORS[(r.av||'?').charCodeAt(0)-65]||'#333';
-                d.innerHTML = `<div class="req-av" style="background:${col}">${r.av}</div><div class="req-info"><div class="req-name">${r.name}</div>${r.msg?'<div class="req-msg">'+r.msg+'</div>':''}</div><div class="req-btns"><button class="btn btn-small btn-green" onclick="acceptReq('${r.id}')">&#10003;</button><button class="btn btn-small btn-red" onclick="rejectReq('${r.id}')">&#10007;</button></div>`;
-                el.appendChild(d);
-            });
-        }
-
-        function renderList() {
-            const el = document.getElementById('chats'); el.innerHTML = '';
-            Object.values(chats).sort((a, b) => b.time - a.time).forEach(c => {
-                const d = document.createElement('div');
-                d.className = 'ci' + (active === c.id ? ' act' : '');
-                const col = COLORS[(c.av||'?').charCodeAt(0)-65]||'#333';
-                d.innerHTML = `<div class="ci-av" style="background:${col}">${c.av}</div><div class="ci-info"><div class="ci-name">${c.name}</div><div class="ci-last">${c.last||''}</div></div>${c.un?'<div class="unread">'+c.un+'</div>':''}<div class="${c.on?'dot-on':'dot-off'}"></div>`;
-                d.onclick = () => open(c.id); el.appendChild(d);
-            });
+            ch.subscribe();
+            channels[room] = ch;
         }
 
         function open(pid) {
@@ -278,11 +208,38 @@
             document.getElementById('msgs').style.display = 'flex';
             document.getElementById('inputBar').style.display = 'flex';
             document.getElementById('empty').style.display = 'none';
-            const col = COLORS[(c.av||'?').charCodeAt(0)-65]||'#333';
-            document.getElementById('mAv').textContent = c.av; document.getElementById('mAv').style.background = col;
+            const col = COLORS[(myAv||'?').charCodeAt(0)-65]||'#333';
+            document.getElementById('mAv').textContent = myAv; document.getElementById('mAv').style.background = col;
             document.getElementById('mName').textContent = c.name;
-            document.getElementById('mStat').textContent = c.on ? 'Online' : 'Offline';
+            document.getElementById('mRoom').textContent = 'Raum: ' + c.room + ' (klicken)';
+            document.getElementById('mRoom').onclick = () => {
+                navigator.clipboard.writeText(c.room);
+                document.getElementById('mRoom').textContent = 'Kopiert!';
+                setTimeout(() => document.getElementById('mRoom').textContent = 'Raum: ' + c.room + ' (klicken)', 1500);
+            };
             renderMsgs();
+            subscribeRoom(pid);
+        }
+
+        function addMsg(room, text, me, name, av, file) {
+            if (!chats[room]) return;
+            chats[room].msgs.push({ text, me, name: name || (me ? myName : ''), av: av || (me ? myAv : '?'), time: Date.now(), file });
+            chats[room].last = text || (file ? 'Datei' : '');
+            chats[room].time = Date.now();
+            if (!me && active !== room) chats[room].un = (chats[room].un || 0) + 1;
+            save(); renderList(); if (active === room) renderMsgs();
+        }
+
+        function save() { ss('c_chats', chats); }
+
+        function renderList() {
+            const el = document.getElementById('chats'); el.innerHTML = '';
+            Object.values(chats).sort((a, b) => b.time - a.time).forEach(c => {
+                const d = document.createElement('div');
+                d.className = 'ci' + (active === c.room ? ' act' : '');
+                d.innerHTML = `<div class="ci-av" style="background:#333">?</div><div class="ci-info"><div class="ci-name">${c.name}</div><div class="ci-last">${c.last||''}</div></div>${c.un?'<div class="unread">'+c.un+'</div>':''}`;
+                d.onclick = () => open(c.room); el.appendChild(d);
+            });
         }
 
         function renderMsgs() {
@@ -292,7 +249,9 @@
                 const d = document.createElement('div');
                 d.className = 'm ' + (m.me ? 'm-me' : 'm-them');
                 const t = new Date(m.time).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                let h = ''; if (m.text) h += m.text;
+                let h = '';
+                if (!m.me && m.name) h += '<div class="m-name">' + m.name + '</div>';
+                if (m.text) h += m.text;
                 if (m.file) {
                     const f = m.file;
                     if ((f.mime||'').startsWith('image/')) h += '<br><img src="'+f.data+'" onclick="pv(this.src)">';
@@ -306,40 +265,43 @@
             el.scrollTop = el.scrollHeight;
         }
 
-        function send() {
+        async function send() {
             const inp = document.getElementById('msgIn'); const txt = inp.value.trim();
             if (!txt || !active) return;
-            const c = conns[active]; if (c && c.open) c.send({ t: 'msg', text: txt });
-            addMsg(active, txt, true); inp.value = ''; inp.style.height = '38px';
+            addMsg(active, txt, true, myName, myAv);
+            const ch = channels[active];
+            if (ch) {
+                await ch.send({ type: 'broadcast', event: 'msg', payload: { uid: myId, text: txt, name: myName, av: myAv } });
+            }
+            inp.value = ''; inp.style.height = '38px';
         }
 
         function handleFile(f) {
             if (!f || !active) return;
             const r = new FileReader();
-            r.onload = () => {
+            r.onload = async () => {
                 const fd = { name: f.name, mime: f.type||'application/octet-stream', size: f.size, data: r.result };
-                const c = conns[active]; if (c && c.open) c.send({ t: 'file', ...fd });
-                addMsg(active, '', true, fd);
+                addMsg(active, '', true, myName, myAv, fd);
+                const ch = channels[active];
+                if (ch) {
+                    await ch.send({ type: 'broadcast', event: 'msg', payload: { uid: myId, text: '', name: myName, av: myAv, file: fd } });
+                }
             };
             r.readAsDataURL(f);
         }
 
         function pv(s) { const p = document.getElementById('preview'); p.querySelector('img').src = s; p.style.display = 'flex'; }
-        function showTyping() { const t = document.getElementById('typing'); t.textContent = 'tippt...'; setTimeout(() => t.textContent = '', 2000); }
         function openModal() { document.getElementById('modal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('modal').style.display = 'none'; document.getElementById('modalPeer').value = ''; document.getElementById('modalName').value = ''; document.getElementById('modalMsg').value = ''; }
-        function addChat() { const p = document.getElementById('modalPeer').value.trim(); const n = document.getElementById('modalName').value.trim() || p; const m = document.getElementById('modalMsg').value.trim(); if (!p) return; closeModal(); connect(p, n, m); }
-        function delChat() { if (!active) return; if (!confirm('Loeschen?')) return; if (conns[active]) { conns[active].close(); delete conns[active]; } delete chats[active]; active = null; save(); renderList(); document.getElementById('mHead').style.display = 'none'; document.getElementById('msgs').style.display = 'none'; document.getElementById('inputBar').style.display = 'none'; document.getElementById('empty').style.display = 'flex'; }
+        function closeModal() { document.getElementById('modal').style.display = 'none'; document.getElementById('modalRoom').value = ''; }
+        function delChat() { if (!active) return; if (!confirm('Loeschen?')) return; if (channels[active]) { channels[active].unsubscribe(); delete channels[active]; } delete chats[active]; active = null; save(); renderList(); document.getElementById('mHead').style.display = 'none'; document.getElementById('msgs').style.display = 'none'; document.getElementById('inputBar').style.display = 'none'; document.getElementById('empty').style.display = 'flex'; }
 
-        document.getElementById('msgIn').addEventListener('input', () => { if (active && conns[active]) conns[active].send({ t: 'typing' }); const ta = document.getElementById('msgIn'); ta.style.height = '38px'; ta.style.height = Math.min(ta.scrollHeight, 100) + 'px'; });
         document.getElementById('msgIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
         document.getElementById('fileIn').addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value = ''; });
-        document.getElementById('myId').addEventListener('click', () => { navigator.clipboard.writeText(myId); const e = document.getElementById('myId'); e.textContent = 'Kopiert!'; setTimeout(() => e.textContent = 'ID: ' + myId, 1500); });
         document.getElementById('startBtn').addEventListener('click', start);
         document.getElementById('nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') start(); });
 
-        const saved = gs('c_name', ''), savedAv = gs('c_av', '');
-        if (saved && savedAv) { myName = saved; myAv = savedAv; go(); } else { initAv(); }
+        const saved = gs('c_name', ''), savedAv = gs('c_av', ''), savedId = gs('c_id', '');
+        if (saved && savedAv) { myName = saved; myAv = savedAv; myId = savedId || genId(); go(); } else { initAv(); }
     </script>
 </body>
 </html>
