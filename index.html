@@ -27,7 +27,7 @@
         #sideHead { padding: 12px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 10px; }
         #myAv { width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; background: #0af; flex-shrink: 0; }
         #myNm { font-size: 14px; font-weight: bold; color: #0af; }
-        #myId { font-size: 10px; color: #666; cursor: pointer; }
+        #myId { font-size: 10px; color: #666; cursor: pointer; display: none; }
         #newBtn { margin: 10px 12px; background: #0a6; color: #fff; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; }
         #chats { flex: 1; overflow-y: auto; }
         .ci { padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #222; }
@@ -78,7 +78,6 @@
         .req-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; background: #333; flex-shrink: 0; }
         .req-info { flex: 1; }
         .req-name { font-size: 13px; font-weight: bold; color: #f0a030; }
-        .req-id { font-size: 10px; color: #666; }
         .req-msg { font-size: 11px; color: #aaa; margin-top: 2px; font-style: italic; }
     </style>
 </head>
@@ -114,7 +113,7 @@
         <div id="modal">
             <div class="mod">
                 <h3>Neuer Chat</h3>
-                <input type="text" id="modalPeer" placeholder="Peer ID">
+                <input type="text" id="modalPeer" placeholder="Name oder Peer ID">
                 <input type="text" id="modalName" placeholder="Name (optional)">
                 <textarea id="modalMsg" placeholder="Nachricht (optional)"></textarea>
                 <div class="mod-btns"><button class="btn btn-small" onclick="closeModal()">Abbrechen</button><button class="btn btn-small btn-green" onclick="addChat()">Verbinden</button></div>
@@ -283,7 +282,7 @@
                 const d = document.createElement('div');
                 d.className = 'req';
                 const col = COLORS[(r.av||'?').charCodeAt(0)-65]||'#333';
-                d.innerHTML = `<div class="req-av" style="background:${col}">${r.av}</div><div class="req-info"><div class="req-name">${r.name}</div><div class="req-id">${r.id}</div>${r.msg?'<div class="req-msg">'+r.msg+'</div>':''}</div><div class="req-btns"><button class="btn btn-small btn-green" onclick="acceptReq('${r.id}')">&#10003;</button><button class="btn btn-small btn-red" onclick="rejectReq('${r.id}')">&#10007;</button></div>`;
+                d.innerHTML = `<div class="req-av" style="background:${col}">${r.av}</div><div class="req-info"><div class="req-name">${r.name}</div>${r.msg?'<div class="req-msg">'+r.msg+'</div>':''}</div><div class="req-btns"><button class="btn btn-small btn-green" onclick="acceptReq('${r.id}')">&#10003;</button><button class="btn btn-small btn-red" onclick="rejectReq('${r.id}')">&#10007;</button></div>`;
                 el.appendChild(d);
             });
         }
