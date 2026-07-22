@@ -18,6 +18,7 @@
         .btn-red { background: #d44; } .btn-red:hover { background: #b22; }
         .btn-small { padding: 6px 14px; font-size: 12px; }
         .btn-green { background: #0a6; } .btn-green:hover { background: #085; }
+        .btn-orange { background: #e67e22; } .btn-orange:hover { background: #d35400; }
         #avatars { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 350px; }
         .av { width: 45px; height: 45px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; background: #333; color: #fff; }
         .av:hover { border-color: #0af; } .av.sel { border-color: #0af; background: #0af; }
@@ -59,7 +60,8 @@
         #modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
         .mod { background: #1e1e1e; padding: 20px; border-radius: 8px; width: 300px; }
         .mod h3 { margin-bottom: 12px; color: #0af; font-size: 16px; }
-        .mod input { width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; margin-bottom: 8px; }
+        .mod input, .mod textarea { width: 100%; background: #222; border: 1px solid #444; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; outline: none; margin-bottom: 8px; }
+        .mod textarea { resize: none; height: 60px; font-family: Arial, sans-serif; }
         .mod-btns { display: flex; gap: 8px; justify-content: flex-end; }
         #preview { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 200; justify-content: center; align-items: center; cursor: pointer; }
         #preview img { max-width: 90%; max-height: 90%; }
@@ -67,6 +69,24 @@
         .st-ok { background: #0a6; color: #fff; }
         .st-err { background: #d44; color: #fff; }
         .st-wait { background: #a60; color: #fff; }
+        #requests { border-bottom: 1px solid #333; }
+        .req { padding: 10px 12px; display: flex; align-items: center; gap: 8px; background: #1a1a2a; border-bottom: 1px solid #222; }
+        .req-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; background: #333; flex-shrink: 0; }
+        .req-info { flex: 1; }
+        .req-name { font-size: 13px; font-weight: bold; color: #f0a030; }
+        .req-msg { font-size: 11px; color: #aaa; margin-top: 2px; font-style: italic; }
+        .req-btns { display: flex; gap: 5px; }
+        #members { border-bottom: 1px solid #333; padding: 8px 12px; display: none; }
+        #members h4 { font-size: 11px; color: #888; margin-bottom: 6px; }
+        .member { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 12px; }
+        .member-av { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; background: #333; }
+        .member-name { flex: 1; }
+        .badge { font-size: 9px; padding: 1px 4px; border-radius: 3px; }
+        .badge-owner { background: #f39c12; color: #000; }
+        .badge-admin { background: #3498db; color: #fff; }
+        .member-btns { display: flex; gap: 3px; }
+        .member-btns button { background: none; border: none; color: #888; cursor: pointer; font-size: 14px; padding: 2px; }
+        .member-btns button:hover { color: #fff; }
     </style>
 </head>
 <body>
@@ -84,6 +104,8 @@
                 <div><div id="myNm"></div></div>
             </div>
             <button id="newBtn" onclick="openModal()">+ Neuer Chat</button>
+            <div id="requests"></div>
+            <div id="members"></div>
             <div id="chats"></div>
         </div>
         <div id="main">
@@ -101,6 +123,7 @@
             <div class="mod">
                 <h3>Neuer Chat</h3>
                 <input type="text" id="modalRoom" placeholder="Raum-Code (z.B. abc123)">
+                <textarea id="modalMsg" placeholder="Nachricht (optional)"></textarea>
                 <div class="mod-btns"><button class="btn btn-small" onclick="closeModal()">Abbrechen</button><button class="btn btn-small btn-green" onclick="joinRoom()">Beitreten</button></div>
             </div>
         </div>
@@ -112,10 +135,10 @@
         const COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e91e63','#00bcd4','#8bc34a'];
         let sb, myName, myAv, myId;
         let chats = {}, active = null, channels = {};
+        let requests = {};
 
         function gs(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
         function ss(k, v) { localStorage.setItem(k, JSON.stringify(v)) }
-
         function genId() { return Math.random().toString(36).substr(2, 9); }
 
         function initAv() {
@@ -132,28 +155,21 @@
         async function initSupabase() {
             const status = document.getElementById('status');
             try {
-                console.log('Supabase wird initialisiert...');
                 sb = window.supabase.createClient(
                     'https://jrhzqntlihqdwjuvefow.supabase.co',
                     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpyaHpxbnRsaWhxZHdqdXZlZm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MzE3NzAsImV4cCI6MjEwMDMwNzc3MH0.dGGxrVBHN3rCWDRjY7lMnNN5tb_vpfJpHA7olLageBU'
                 );
-                console.log('Supabase Client erstellt');
                 status.textContent = 'Verbunden';
                 status.className = 'st-ok';
-                return true;
             } catch(e) {
-                console.error('Supabase Fehler:', e);
                 status.textContent = 'Fehler: ' + e.message;
                 status.className = 'st-err';
-                return false;
             }
         }
 
         function start() {
-            console.log('Start geklickt');
             myName = document.getElementById('nameIn').value.trim();
             const sel = document.querySelector('.av.sel');
-            console.log('Name:', myName, 'Avatar:', sel ? sel.textContent : 'keiner');
             if (!myName) { alert('Name eingeben'); return; }
             if (!sel) { alert('Avatar waehlen'); return; }
             myAv = sel.textContent;
@@ -163,30 +179,28 @@
         }
 
         async function go() {
-            console.log('go() aufgerufen');
             document.getElementById('setup').style.display = 'none';
             document.getElementById('sidebar').style.display = 'flex';
             document.getElementById('main').style.display = 'flex';
             document.getElementById('myNm').textContent = myName;
             document.getElementById('myAv').textContent = myAv;
             document.getElementById('myAv').style.background = COLORS[myAv.charCodeAt(0) - 65] || '#333';
-            chats = gs('c_chats', {});
-            renderList();
-            console.log('Supabase wird initialisiert...');
+            chats = gs('c_chats', {}); requests = gs('c_reqs', {});
+            renderList(); renderReqs(); renderMembers();
             await initSupabase();
-            console.log('Supabase initialisiert');
         }
 
-        function joinRoom() {
-            const code = document.getElementById('modalRoom').value.trim().toLowerCase();
-            if (!code) return;
-            closeModal();
-            if (!chats[code]) {
-                chats[code] = { room: code, name: 'Raum ' + code, msgs: [], last: '', time: Date.now(), un: 0 };
-                ss('c_chats', chats); renderList();
-            }
-            subscribeRoom(code);
-            open(code);
+        function getRole(room) {
+            const c = chats[room];
+            if (!c) return null;
+            if (c.owner === myId) return 'owner';
+            if (c.admins && c.admins.includes(myId)) return 'admin';
+            return 'member';
+        }
+
+        function isBanned(room, uid) {
+            const c = chats[room];
+            return c && c.banned && c.banned.includes(uid);
         }
 
         function subscribeRoom(room) {
@@ -195,15 +209,179 @@
             ch.on('broadcast', { event: 'msg' }, payload => {
                 const d = payload.payload;
                 if (d.uid === myId) return;
+                if (isBanned(room, d.uid)) return;
                 addMsg(room, d.text, false, d.name, d.av, d.file);
+            });
+            ch.on('broadcast', { event: 'join' }, payload => {
+                const d = payload.payload;
+                if (d.uid === myId) return;
+                if (isBanned(room, d.uid)) return;
+                if (!chats[room]) return;
+                const key = room + '_' + d.uid;
+                if (!requests[key]) {
+                    requests[key] = { room: room, uid: d.uid, name: d.name, av: d.av, msg: d.msg || '', time: Date.now() };
+                    ss('c_reqs', requests); renderReqs();
+                }
+            });
+            ch.on('broadcast', { event: 'accept' }, payload => {
+                const d = payload.payload;
+                if (chats[room]) {
+                    if (!chats[room].members) chats[room].members = [];
+                    if (!chats[room].members.find(m => m.uid === d.uid)) {
+                        chats[room].members.push({ uid: d.uid, name: d.name, av: d.av });
+                    }
+                    if (d.uid === myId) {
+                        chats[room].accepted = true;
+                        open(room);
+                    }
+                    ss('c_chats', chats); renderList(); renderMembers();
+                }
+            });
+            ch.on('broadcast', { event: 'kick' }, payload => {
+                const d = payload.payload;
+                if (d.uid === myId) {
+                    alert('Du wurdest aus dem Raum entfernt!');
+                    if (channels[room]) { channels[room].unsubscribe(); delete channels[room]; }
+                    delete chats[room]; active = null; save(); renderList();
+                    document.getElementById('mHead').style.display = 'none';
+                    document.getElementById('msgs').style.display = 'none';
+                    document.getElementById('inputBar').style.display = 'none';
+                    document.getElementById('empty').style.display = 'flex';
+                }
+            });
+            ch.on('broadcast', { event: 'ban' }, payload => {
+                const d = payload.payload;
+                if (d.uid === myId) {
+                    alert('Du wurdest gebannt!');
+                    if (channels[room]) { channels[room].unsubscribe(); delete channels[room]; }
+                    delete chats[room]; active = null; save(); renderList();
+                    document.getElementById('mHead').style.display = 'none';
+                    document.getElementById('msgs').style.display = 'none';
+                    document.getElementById('inputBar').style.display = 'none';
+                    document.getElementById('empty').style.display = 'flex';
+                }
+            });
+            ch.on('broadcast', { event: 'admin' }, payload => {
+                const d = payload.payload;
+                if (d.uid === myId) {
+                    alert('Du bist jetzt Admin!');
+                    if (chats[room]) {
+                        if (!chats[room].admins) chats[room].admins = [];
+                        chats[room].admins.push(myId);
+                        ss('c_chats', chats); renderMembers();
+                    }
+                }
             });
             ch.subscribe();
             channels[room] = ch;
         }
 
+        function joinRoom() {
+            const code = document.getElementById('modalRoom').value.trim().toLowerCase();
+            const msg = document.getElementById('modalMsg').value.trim();
+            if (!code) return;
+            closeModal();
+            subscribeRoom(code);
+            setTimeout(() => {
+                if (channels[code]) {
+                    channels[code].send({ type: 'broadcast', event: 'join', payload: { uid: myId, name: myName, av: myAv, msg: msg } });
+                }
+            }, 500);
+            if (!chats[code]) {
+                chats[code] = { room: code, name: 'Raum ' + code, msgs: [], last: '', time: Date.now(), un: 0, accepted: false, owner: null, admins: [], banned: [], members: [] };
+                ss('c_chats', chats); renderList();
+            }
+            document.getElementById('empty').textContent = 'Warte auf Annahme...';
+        }
+
+        function acceptReq(key) {
+            const req = requests[key]; if (!req) return;
+            const room = req.room;
+            if (!chats[room]) {
+                chats[room] = { room: room, name: 'Raum ' + room, msgs: [], last: '', time: Date.now(), un: 0, accepted: true, owner: myId, admins: [], banned: [], members: [] };
+            }
+            if (!chats[room].owner) chats[room].owner = myId;
+            chats[room].accepted = true;
+            if (!chats[room].members) chats[room].members = [];
+            if (!chats[room].members.find(m => m.uid === req.uid)) {
+                chats[room].members.push({ uid: req.uid, name: req.name, av: req.av });
+            }
+            if (req.msg) {
+                chats[room].msgs.push({ text: req.msg, me: false, name: req.name, av: req.av, time: Date.now() });
+                chats[room].last = req.msg;
+            }
+            delete requests[key];
+            ss('c_reqs', requests); ss('c_chats', chats); renderList(); renderReqs(); renderMembers();
+            subscribeRoom(room);
+            setTimeout(() => {
+                if (channels[room]) {
+                    channels[room].send({ type: 'broadcast', event: 'accept', payload: { uid: req.uid, name: req.name, av: req.av } });
+                }
+            }, 500);
+            open(room);
+        }
+
+        function rejectReq(key) {
+            delete requests[key];
+            ss('c_reqs', requests); renderReqs();
+        }
+
+        function kickUser(uid) {
+            if (!active || !chats[active]) return;
+            const role = getRole(active);
+            if (role !== 'owner' && role !== 'admin') { alert('Keine Berechtigung'); return; }
+            if (!confirm('Nutzer entfernen?')) return;
+            chats[active].members = chats[active].members.filter(m => m.uid !== uid);
+            ss('c_chats', chats); renderMembers();
+            if (channels[active]) {
+                channels[active].send({ type: 'broadcast', event: 'kick', payload: { uid: uid } });
+            }
+        }
+
+        function banUser(uid) {
+            if (!active || !chats[active]) return;
+            const role = getRole(active);
+            if (role !== 'owner' && role !== 'admin') { alert('Keine Berechtigung'); return; }
+            if (!confirm('Nutzer bannen?')) return;
+            if (!chats[active].banned) chats[active].banned = [];
+            chats[active].banned.push(uid);
+            chats[active].members = chats[active].members.filter(m => m.uid !== uid);
+            ss('c_chats', chats); renderMembers();
+            if (channels[active]) {
+                channels[active].send({ type: 'broadcast', event: 'ban', payload: { uid: uid } });
+            }
+        }
+
+        function makeAdmin(uid) {
+            if (!active || !chats[active]) return;
+            if (getRole(active) !== 'owner') { alert('Nur der Besitzer kann Admins ernennen'); return; }
+            if (!chats[active].admins) chats[active].admins = [];
+            chats[active].admins.push(uid);
+            ss('c_chats', chats); renderMembers();
+            if (channels[active]) {
+                channels[active].send({ type: 'broadcast', event: 'admin', payload: { uid: uid } });
+            }
+        }
+
+        function unbanUser(uid) {
+            if (!active || !chats[active]) return;
+            const role = getRole(active);
+            if (role !== 'owner' && role !== 'admin') { alert('Keine Berechtigung'); return; }
+            chats[active].banned = chats[active].banned.filter(u => u !== uid);
+            ss('c_chats', chats); renderMembers();
+        }
+
         function open(pid) {
             active = pid; const c = chats[pid]; if (!c) return;
             c.un = 0; save(); renderList();
+            if (!c.accepted) {
+                document.getElementById('mHead').style.display = 'none';
+                document.getElementById('msgs').style.display = 'none';
+                document.getElementById('inputBar').style.display = 'none';
+                document.getElementById('empty').style.display = 'flex';
+                document.getElementById('empty').textContent = 'Warte auf Annahme...';
+                return;
+            }
             document.getElementById('mHead').style.display = 'flex';
             document.getElementById('msgs').style.display = 'flex';
             document.getElementById('inputBar').style.display = 'flex';
@@ -217,7 +395,7 @@
                 document.getElementById('mRoom').textContent = 'Kopiert!';
                 setTimeout(() => document.getElementById('mRoom').textContent = 'Raum: ' + c.room + ' (klicken)', 1500);
             };
-            renderMsgs();
+            renderMsgs(); renderMembers();
             subscribeRoom(pid);
         }
 
@@ -231,6 +409,51 @@
         }
 
         function save() { ss('c_chats', chats); }
+
+        function renderReqs() {
+            const el = document.getElementById('requests'); el.innerHTML = '';
+            Object.entries(requests).forEach(([key, r]) => {
+                const d = document.createElement('div'); d.className = 'req';
+                const col = COLORS[(r.av||'?').charCodeAt(0)-65]||'#333';
+                d.innerHTML = `<div class="req-av" style="background:${col}">${r.av}</div><div class="req-info"><div class="req-name">${r.name}</div>${r.msg?'<div class="req-msg">'+r.msg+'</div>':''}</div><div class="req-btns"><button class="btn btn-small btn-green" onclick="acceptReq('${key}')">&#10003;</button><button class="btn btn-small btn-red" onclick="rejectReq('${key}')">&#10007;</button></div>`;
+                el.appendChild(d);
+            });
+        }
+
+        function renderMembers() {
+            const el = document.getElementById('members');
+            if (!active || !chats[active]) { el.style.display = 'none'; return; }
+            const c = chats[active];
+            if (!c.members || c.members.length === 0) { el.style.display = 'none'; return; }
+            el.style.display = 'block';
+            const role = getRole(active);
+            let html = '<h4>Mitglieder (' + c.members.length + ')</h4>';
+            c.members.forEach(m => {
+                const col = COLORS[(m.av||'?').charCodeAt(0)-65]||'#333';
+                const isMe = m.uid === myId;
+                const mRole = m.uid === c.owner ? 'owner' : (c.admins && c.admins.includes(m.uid) ? 'admin' : 'member');
+                html += `<div class="member"><div class="member-av" style="background:${col}">${m.av}</div><div class="member-name">${m.name}${isMe?' (Du)':''}</div>`;
+                if (mRole === 'owner') html += '<span class="badge badge-owner">Owner</span>';
+                else if (mRole === 'admin') html += '<span class="badge badge-admin">Admin</span>';
+                if (!isMe && (role === 'owner' || role === 'admin')) {
+                    if (mRole === 'member') {
+                        html += `<div class="member-btns">`;
+                        if (role === 'owner') html += `<button onclick="makeAdmin('${m.uid}')" title="Admin machen">A</button>`;
+                        html += `<button onclick="kickUser('${m.uid}')" title="Entfernen">X</button><button onclick="banUser('${m.uid}')" title="Bannen">B</button></div>`;
+                    } else if (mRole === 'admin' && role === 'owner') {
+                        html += `<div class="member-btns"><button onclick="kickUser('${m.uid}')" title="Entfernen">X</button><button onclick="banUser('${m.uid}')" title="Bannen">B</button></div>`;
+                    }
+                }
+                html += '</div>';
+            });
+            if (c.banned && c.banned.length > 0 && (role === 'owner' || role === 'admin')) {
+                html += '<h4 style="margin-top:8px">Gebannt</h4>';
+                c.banned.forEach(uid => {
+                    html += `<div class="member"><div class="member-av" style="background:#444">?</div><div class="member-name">${uid}</div><div class="member-btns"><button onclick="unbanUser('${uid}')" title="Entbannen">U</button></div></div>`;
+                });
+            }
+            el.innerHTML = html;
+        }
 
         function renderList() {
             const el = document.getElementById('chats'); el.innerHTML = '';
@@ -268,6 +491,8 @@
         async function send() {
             const inp = document.getElementById('msgIn'); const txt = inp.value.trim();
             if (!txt || !active) return;
+            const c = chats[active];
+            if (!c || !c.accepted) { alert('Warte auf Annahme der Anfrage'); return; }
             addMsg(active, txt, true, myName, myAv);
             const ch = channels[active];
             if (ch) {
@@ -278,6 +503,8 @@
 
         function handleFile(f) {
             if (!f || !active) return;
+            const c = chats[active];
+            if (!c || !c.accepted) { alert('Warte auf Annahme der Anfrage'); return; }
             const r = new FileReader();
             r.onload = async () => {
                 const fd = { name: f.name, mime: f.type||'application/octet-stream', size: f.size, data: r.result };
@@ -292,8 +519,8 @@
 
         function pv(s) { const p = document.getElementById('preview'); p.querySelector('img').src = s; p.style.display = 'flex'; }
         function openModal() { document.getElementById('modal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('modal').style.display = 'none'; document.getElementById('modalRoom').value = ''; }
-        function delChat() { if (!active) return; if (!confirm('Loeschen?')) return; if (channels[active]) { channels[active].unsubscribe(); delete channels[active]; } delete chats[active]; active = null; save(); renderList(); document.getElementById('mHead').style.display = 'none'; document.getElementById('msgs').style.display = 'none'; document.getElementById('inputBar').style.display = 'none'; document.getElementById('empty').style.display = 'flex'; }
+        function closeModal() { document.getElementById('modal').style.display = 'none'; document.getElementById('modalRoom').value = ''; document.getElementById('modalMsg').value = ''; }
+        function delChat() { if (!active) return; if (!confirm('Loeschen?')) return; if (channels[active]) { channels[active].unsubscribe(); delete channels[active]; } delete chats[active]; active = null; save(); renderList(); renderMembers(); document.getElementById('mHead').style.display = 'none'; document.getElementById('msgs').style.display = 'none'; document.getElementById('inputBar').style.display = 'none'; document.getElementById('empty').style.display = 'flex'; }
 
         document.getElementById('msgIn').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
         document.getElementById('fileIn').addEventListener('change', e => { handleFile(e.target.files[0]); e.target.value = ''; });
