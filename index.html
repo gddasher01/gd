@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>P2P Chat</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #111; color: #eee; font-family: Arial, sans-serif; height: 100vh; display: flex; justify-content: center; align-items: center; }
@@ -79,6 +79,8 @@
         .req-name { font-size: 13px; font-weight: bold; color: #f0a030; }
         .req-msg { font-size: 11px; color: #aaa; margin-top: 2px; font-style: italic; }
         .req-btns { display: flex; gap: 5px; }
+        #log { position: fixed; bottom: 0; left: 0; right: 0; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 8px; max-height: 150px; overflow-y: auto; z-index: 999; display: none; }
+        #logBtn { position: fixed; bottom: 5px; right: 5px; background: #333; color: #fff; border: none; padding: 5px 10px; font-size: 10px; cursor: pointer; z-index: 1000; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -130,10 +132,12 @@
         <div id="preview" onclick="this.style.display='none'"><img></div>
     </div>
     <div id="status" class="st-wait">Verbinde...</div>
+    <div id="log"></div>
+    <button id="logBtn" onclick="toggleLog()">LOG</button>
 
     <script>
         const COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e91e63','#00bcd4','#8bc34a'];
-        let sb, myName, myAv, myId, myUsername;
+        let sb = null, myName, myAv, myId, myUsername;
         let chats = {}, active = null, channels = {};
         let requests = {};
         let currentTab = 'privat';
@@ -141,6 +145,8 @@
         function gs(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
         function ss(k, v) { localStorage.setItem(k, JSON.stringify(v)) }
         function genId() { return Math.random().toString(36).substr(2, 9); }
+        function log(msg) { const el = document.getElementById('log'); el.innerHTML += '<div>' + new Date().toLocaleTimeString() + ' ' + msg + '</div>'; el.scrollTop = el.scrollHeight; console.log(msg); }
+        function toggleLog() { const el = document.getElementById('log'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; }
 
         function initAv() {
             const el = document.getElementById('avatars'); el.innerHTML = '';
@@ -153,16 +159,26 @@
             }
         }
 
-        async function initSupabase() {
+        function initSupabase() {
             const status = document.getElementById('status');
+            log('Supabase wird initialisiert...');
             try {
-                sb = window.supabase.createClient(
+                if (typeof supabase === 'undefined') {
+                    log('FEHLER: supabase Bibliothek nicht geladen!');
+                    status.textContent = 'Bibliothek nicht geladen';
+                    status.className = 'st-err';
+                    return;
+                }
+                log('supabase Objekt gefunden: ' + typeof supabase.createClient);
+                sb = supabase.createClient(
                     'https://jrhzqntlihqdwjuvefow.supabase.co',
                     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpyaHpxbnRsaWhxZHdqdXZlZm93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MzE3NzAsImV4cCI6MjEwMDMwNzc3MH0.dGGxrVBHN3rCWDRjY7lMnNN5tb_vpfJpHA7olLageBU'
                 );
+                log('Supabase Client erstellt!');
                 status.textContent = 'Verbunden';
                 status.className = 'st-ok';
             } catch(e) {
+                log('FEHLER beim Erstellen: ' + e.message);
                 status.textContent = 'Fehler: ' + e.message;
                 status.className = 'st-err';
             }
@@ -181,7 +197,7 @@
             go();
         }
 
-        async function go() {
+        function go() {
             document.getElementById('setup').style.display = 'none';
             document.getElementById('sidebar').style.display = 'flex';
             document.getElementById('main').style.display = 'flex';
@@ -196,8 +212,13 @@
             };
             chats = gs('c_chats', {}); requests = gs('c_reqs', {});
             renderList(); renderReqs();
-            await initSupabase();
-            subscribeRoom('user-' + myUsername);
+            initSupabase();
+            setTimeout(() => {
+                if (sb) {
+                    subscribeRoom('user-' + myUsername);
+                    log('Eigenen Username-Raum abonniert: user-' + myUsername);
+                }
+            }, 500);
         }
 
         function switchTab(tab) {
@@ -215,11 +236,8 @@
         }
 
         function doJoin() {
-            if (currentTab === 'privat') {
-                joinPrivate();
-            } else {
-                joinGroup();
-            }
+            if (currentTab === 'privat') joinPrivate();
+            else joinGroup();
         }
 
         function joinPrivate() {
@@ -228,14 +246,19 @@
             if (!username) return;
             if (username === myUsername) { alert('Du kannst nicht mit dir selbst chatten'); return; }
             closeModal();
+            if (!sb) { alert('Nicht verbunden!'); return; }
             const chatId = [myUsername, username].sort().join('_');
+            log('Privater Chat mit: ' + username + ' (chatId: ' + chatId + ')');
             subscribeRoom('user-' + username);
             setTimeout(() => {
                 const ch = channels['user-' + username];
                 if (ch) {
+                    log('Sende Anfrage an user-' + username);
                     ch.send({ type: 'broadcast', event: 'request', payload: { from: myUsername, name: myName, av: myAv, msg: msg } });
+                } else {
+                    log('FEHLER: Kein Channel fuer user-' + username);
                 }
-            }, 500);
+            }, 1000);
             if (!chats[chatId]) {
                 chats[chatId] = { id: chatId, name: username, type: 'privat', username: username, msgs: [], last: '', time: Date.now(), un: 0, accepted: false };
                 ss('c_chats', chats); renderList();
@@ -247,6 +270,7 @@
             const code = document.getElementById('modalRoom').value.trim().toLowerCase();
             if (!code) return;
             closeModal();
+            if (!sb) { alert('Nicht verbunden!'); return; }
             subscribeRoom('grp-' + code);
             if (!chats['grp-' + code]) {
                 chats['grp-' + code] = { id: 'grp-' + code, name: 'Gruppe ' + code, type: 'gruppe', room: code, msgs: [], last: '', time: Date.now(), un: 0, accepted: true };
@@ -256,11 +280,13 @@
         }
 
         function subscribeRoom(room) {
-            if (channels[room]) return;
-            const ch = sb.channel('chat-' + room, { config: { broadcast: { self: false } } });
+            if (channels[room]) { log('Channel existiert bereits: ' + room); return; }
+            log('Abonniere Channel: ' + room);
+            const ch = sb.channel(room, { config: { broadcast: { self: false } } });
             ch.on('broadcast', { event: 'msg' }, payload => {
                 const d = payload.payload;
-                if (d.uid === myId) return;
+                log('Nachricht empfangen in ' + room + ' von ' + d.from);
+                if (d.from === myUsername) return;
                 const chatId = findChatId(room, d.from);
                 if (chatId && chats[chatId]) {
                     addMsg(chatId, d.text, false, d.name, d.av, d.file);
@@ -268,6 +294,7 @@
             });
             ch.on('broadcast', { event: 'request' }, payload => {
                 const d = payload.payload;
+                log('Anfrage empfangen von ' + d.from);
                 if (d.from === myUsername) return;
                 const chatId = [myUsername, d.from].sort().join('_');
                 if (!chats[chatId]) {
@@ -278,6 +305,7 @@
             });
             ch.on('broadcast', { event: 'accept' }, payload => {
                 const d = payload.payload;
+                log('Annahme empfangen von ' + d.from);
                 if (d.from === myUsername) return;
                 const chatId = [myUsername, d.from].sort().join('_');
                 if (chats[chatId]) {
@@ -286,14 +314,18 @@
                     if (active === chatId) open(chatId);
                 }
             });
-            ch.subscribe();
+            ch.subscribe((status) => {
+                log('Channel Status: ' + status + ' fuer ' + room);
+                if (status === 'SUBSCRIBED') {
+                    log('Erfolgreich abonniert: ' + room);
+                }
+            });
             channels[room] = ch;
         }
 
         function findChatId(room, from) {
             if (room.startsWith('grp-')) return room;
-            const other = room.replace('user-', '');
-            return [myUsername, other].sort().join('_');
+            return [myUsername, from].sort().join('_');
         }
 
         function acceptReq(chatId) {
@@ -311,9 +343,10 @@
             setTimeout(() => {
                 const ch = channels['user-' + req.from];
                 if (ch) {
+                    log('Sende Annahme an user-' + req.from);
                     ch.send({ type: 'broadcast', event: 'accept', payload: { from: myUsername } });
                 }
-            }, 500);
+            }, 1000);
             open(chatId);
         }
 
@@ -341,19 +374,9 @@
             document.getElementById('mAv').textContent = myAv; document.getElementById('mAv').style.background = col;
             document.getElementById('mName').textContent = c.name;
             if (c.type === 'privat') {
-                document.getElementById('mInfo').textContent = '@' + c.username + ' (klicken)';
-                document.getElementById('mInfo').onclick = () => {
-                    navigator.clipboard.writeText(c.username);
-                    document.getElementById('mInfo').textContent = 'Kopiert!';
-                    setTimeout(() => document.getElementById('mInfo').textContent = '@' + c.username + ' (klicken)', 1500);
-                };
+                document.getElementById('mInfo').textContent = '@' + c.username;
             } else {
-                document.getElementById('mInfo').textContent = 'Raum: ' + c.room + ' (klicken)';
-                document.getElementById('mInfo').onclick = () => {
-                    navigator.clipboard.writeText(c.room);
-                    document.getElementById('mInfo').textContent = 'Kopiert!';
-                    setTimeout(() => document.getElementById('mInfo').textContent = 'Raum: ' + c.room + ' (klicken)', 1500);
-                };
+                document.getElementById('mInfo').textContent = 'Raum: ' + c.room;
             }
             renderMsgs();
         }
@@ -420,12 +443,7 @@
             const c = chats[active];
             if (!c || !c.accepted) { alert('Warte auf Annahme'); return; }
             addMsg(active, txt, true, myName, myAv);
-            let room;
-            if (c.type === 'privat') {
-                room = 'user-' + c.username;
-            } else {
-                room = 'grp-' + c.room;
-            }
+            let room = c.type === 'privat' ? 'user-' + c.username : 'grp-' + c.room;
             const ch = channels[room];
             if (ch) {
                 await ch.send({ type: 'broadcast', event: 'msg', payload: { uid: myId, text: txt, name: myName, av: myAv, from: myUsername } });
