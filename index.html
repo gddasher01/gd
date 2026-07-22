@@ -9,7 +9,6 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #111; color: #eee; font-family: Arial, sans-serif; height: 100vh; display: flex; justify-content: center; align-items: center; }
         #app { width: 900px; height: 600px; display: flex; background: #1a1a1a; border-radius: 8px; overflow: hidden; }
-
         #setup { width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 15px; padding: 40px; }
         #setup h1 { color: #0af; font-size: 28px; }
         #setup input { background: #222; border: 1px solid #444; color: #fff; padding: 10px 15px; border-radius: 6px; font-size: 16px; width: 250px; text-align: center; outline: none; }
@@ -22,7 +21,6 @@
         #avatars { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 350px; }
         .av { width: 45px; height: 45px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; background: #333; color: #fff; }
         .av:hover { border-color: #0af; } .av.sel { border-color: #0af; background: #0af; }
-
         #sidebar { width: 260px; background: #151515; border-right: 1px solid #333; display: none; flex-direction: column; }
         #sideHead { padding: 12px; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 10px; }
         #myAv { width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: bold; background: #0af; flex-shrink: 0; }
@@ -39,7 +37,6 @@
         .unread { background: #0af; color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 8px; }
         .dot-on { width: 7px; height: 7px; background: #0a6; border-radius: 50%; }
         .dot-off { width: 7px; height: 7px; background: #444; border-radius: 50%; }
-
         #main { flex: 1; display: none; flex-direction: column; }
         #mHead { padding: 10px 15px; background: #1e1e1e; border-bottom: 1px solid #333; display: none; align-items: center; gap: 10px; }
         #mAv { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; background: #333; }
@@ -63,7 +60,6 @@
         #fileIn { display: none; }
         .btn-file { background: #a0f; padding: 8px 10px; font-size: 16px; }
         #typing { color: #0af; font-size: 11px; padding: 2px 15px; min-height: 16px; font-style: italic; }
-
         #modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
         .mod { background: #1e1e1e; padding: 20px; border-radius: 8px; width: 300px; }
         .mod h3 { margin-bottom: 12px; color: #0af; font-size: 16px; }
@@ -72,13 +68,13 @@
         .mod-btns { display: flex; gap: 8px; justify-content: flex-end; }
         #preview { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 200; justify-content: center; align-items: center; cursor: pointer; }
         #preview img { max-width: 90%; max-height: 90%; }
-
         #requests { border-bottom: 1px solid #333; }
         .req { padding: 10px 12px; display: flex; align-items: center; gap: 8px; background: #1a1a2a; border-bottom: 1px solid #222; }
         .req-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; background: #333; flex-shrink: 0; }
         .req-info { flex: 1; }
         .req-name { font-size: 13px; font-weight: bold; color: #f0a030; }
         .req-msg { font-size: 11px; color: #aaa; margin-top: 2px; font-style: italic; }
+        .req-btns { display: flex; gap: 5px; }
     </style>
 </head>
 <body>
@@ -126,8 +122,7 @@
         const COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#1abc9c','#3498db','#9b59b6','#e91e63','#00bcd4','#8bc34a'];
         let peer, myId, myName, myAv;
         let chats = {}, active = null, conns = {};
-        let requests = {};
-        let pendingConns = {};
+        let requests = {}, pendingConns = {};
 
         function gs(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d } catch { return d } }
         function ss(k, v) { localStorage.setItem(k, JSON.stringify(v)) }
@@ -149,8 +144,7 @@
             if (!myName) { alert('Name eingeben'); return; }
             if (!sel) { alert('Avatar waehlen'); return; }
             myAv = sel.textContent;
-            ss('c_name', myName); ss('c_av', myAv);
-            go();
+            ss('c_name', myName); ss('c_av', myAv); go();
         }
 
         function go() {
@@ -160,92 +154,76 @@
             document.getElementById('myNm').textContent = myName;
             document.getElementById('myAv').textContent = myAv;
             document.getElementById('myAv').style.background = COLORS[myAv.charCodeAt(0) - 65] || '#333';
-            chats = gs('c_chats', {});
-            requests = gs('c_reqs', {});
-            renderList();
-            renderReqs();
-            initPeer();
+            chats = gs('c_chats', {}); requests = gs('c_reqs', {});
+            renderList(); renderReqs(); initPeer();
+        }
+
+        function setupConn(c) {
+            const pid = c.peer;
+            c.on('data', d => {
+                if (d.t === 'info') {
+                    if (chats[pid]) {
+                        chats[pid].name = d.n; chats[pid].av = d.a; chats[pid].on = true;
+                        conns[pid] = c; save(); renderList();
+                        c.send({ t: 'accepted' });
+                        if (active === pid) open(pid);
+                    } else if (requests[pid]) {
+                        pendingConns[pid] = c;
+                    } else {
+                        requests[pid] = { id: pid, name: d.n, av: d.a, msg: d.msg || '', time: Date.now() };
+                        pendingConns[pid] = c; ss('c_reqs', requests); renderReqs();
+                        c.send({ t: 'request', n: myName, a: myAv, msg: '' });
+                    }
+                } else if (d.t === 'request') {
+                    if (!chats[pid] && !requests[pid]) {
+                        requests[pid] = { id: pid, name: d.n, av: d.a, msg: d.msg || '', time: Date.now() };
+                        pendingConns[pid] = c; ss('c_reqs', requests); renderReqs();
+                    }
+                } else if (d.t === 'accepted') {
+                    if (chats[pid]) { chats[pid].on = true; save(); renderList(); open(pid); }
+                } else if (d.t === 'msg') {
+                    addMsg(pid, d.text, false);
+                } else if (d.t === 'file') {
+                    addMsg(pid, '', false, d);
+                } else if (d.t === 'typing') {
+                    showTyping();
+                }
+            });
+            c.on('close', () => {
+                if (chats[pid]) { chats[pid].on = false; save(); renderList(); }
+                delete conns[pid]; delete pendingConns[pid];
+            });
         }
 
         function initPeer() {
             peer = new Peer();
             peer.on('open', id => { myId = id; document.getElementById('myId').textContent = 'ID: ' + id; });
             peer.on('connection', c => {
-                c.on('open', () => c.send({ t: 'info', n: myName, a: myAv }));
-                c.on('data', d => {
-                    if (d.t === 'info') {
-                        const pid = c.peer;
-                        if (chats[pid]) {
-                            chats[pid].name = d.n; chats[pid].av = d.a; chats[pid].on = true;
-                            conns[pid] = c; save(); renderList(); bindData(c, pid);
-                            c.send({ t: 'accepted' });
-                            if (active === pid) open(pid);
-                        } else if (requests[pid]) {
-                            pendingConns[pid] = c;
-                        } else {
-                            requests[pid] = { id: pid, name: d.n, av: d.a, msg: d.msg || '', time: Date.now() };
-                            pendingConns[pid] = c;
-                            ss('c_reqs', requests);
-                            renderReqs();
-                            c.send({ t: 'request', n: myName, a: myAv, msg: d.msg || '' });
-                        }
-                    } else if (d.t === 'request') {
-                        const pid = c.peer;
-                        if (!chats[pid] && !requests[pid]) {
-                            requests[pid] = { id: pid, name: d.n, av: d.a, msg: d.msg || '', time: Date.now() };
-                            pendingConns[pid] = c;
-                            ss('c_reqs', requests);
-                            renderReqs();
-                        }
-                    } else if (d.t === 'accepted') {
-                        const pid = c.peer;
-                        if (chats[pid]) { chats[pid].on = true; save(); renderList(); }
-                    }
-                });
-                c.on('close', () => {
-                    const pid = c.peer;
-                    if (chats[pid]) { chats[pid].on = false; save(); renderList(); }
-                    delete conns[pid]; delete pendingConns[pid];
-                });
-            });
-        }
-
-        function bindData(c, pid) {
-            c.on('data', d => {
-                if (d.t === 'info' || d.t === 'request' || d.t === 'accepted') return;
-                if (d.t === 'msg') addMsg(pid, d.text, false);
-                else if (d.t === 'file') addMsg(pid, '', false, d);
-                else if (d.t === 'typing') showTyping();
+                c.on('open', () => c.send({ t: 'info', n: myName, a: myAv, msg: '' }));
+                setupConn(c);
             });
         }
 
         function acceptReq(pid) {
             const req = requests[pid]; if (!req) return;
-            chats[pid] = { id: pid, name: req.name, av: req.av, msgs: [], last: '', time: Date.now(), un: 0, on: true };
+            chats[pid] = { id: pid, name: req.name, av: req.av, msgs: [], last: '', time: Date.now(), un: 0, on: false };
             if (req.msg) {
                 chats[pid].msgs.push({ text: req.msg, me: false, time: Date.now(), file: null });
                 chats[pid].last = req.msg;
             }
-            delete requests[pid];
-            ss('c_reqs', requests); save(); renderList(); renderReqs();
+            delete requests[pid]; ss('c_reqs', requests); save(); renderList(); renderReqs();
             const c = pendingConns[pid];
             if (c && c.open) {
-                conns[pid] = c;
-                c.send({ t: 'accepted' });
-                bindData(c, pid);
+                conns[pid] = c; c.send({ t: 'accepted' });
                 chats[pid].on = true; save(); renderList();
             }
-            delete pendingConns[pid];
-            open(pid);
+            delete pendingConns[pid]; open(pid);
         }
 
         function rejectReq(pid) {
-            const c = pendingConns[pid];
-            if (c) c.close();
-            delete pendingConns[pid];
-            delete requests[pid];
-            ss('c_reqs', requests);
-            renderReqs();
+            const c = pendingConns[pid]; if (c) c.close();
+            delete pendingConns[pid]; delete requests[pid];
+            ss('c_reqs', requests); renderReqs();
         }
 
         function connect(pid, name, msg) {
@@ -256,12 +234,9 @@
                 if (!chats[pid]) {
                     chats[pid] = { id: pid, name: name || pid, av: '?', msgs: [], last: '', time: Date.now(), un: 0, on: true };
                 } else { chats[pid].on = true; }
-                save(); renderList(); bindData(c, pid); open(pid);
+                save(); renderList(); open(pid);
             });
-            c.on('close', () => {
-                if (chats[pid]) { chats[pid].on = false; save(); renderList(); }
-                delete conns[pid];
-            });
+            setupConn(c);
         }
 
         function addMsg(pid, text, me, file) {
@@ -270,8 +245,7 @@
             chats[pid].last = text || (file ? 'Datei' : '');
             chats[pid].time = Date.now();
             if (!me && active !== pid) chats[pid].un = (chats[pid].un || 0) + 1;
-            save(); renderList();
-            if (active === pid) renderMsgs();
+            save(); renderList(); if (active === pid) renderMsgs();
         }
 
         function save() { ss('c_chats', chats); }
@@ -279,8 +253,7 @@
         function renderReqs() {
             const el = document.getElementById('requests'); el.innerHTML = '';
             Object.values(requests).forEach(r => {
-                const d = document.createElement('div');
-                d.className = 'req';
+                const d = document.createElement('div'); d.className = 'req';
                 const col = COLORS[(r.av||'?').charCodeAt(0)-65]||'#333';
                 d.innerHTML = `<div class="req-av" style="background:${col}">${r.av}</div><div class="req-info"><div class="req-name">${r.name}</div>${r.msg?'<div class="req-msg">'+r.msg+'</div>':''}</div><div class="req-btns"><button class="btn btn-small btn-green" onclick="acceptReq('${r.id}')">&#10003;</button><button class="btn btn-small btn-red" onclick="rejectReq('${r.id}')">&#10007;</button></div>`;
                 el.appendChild(d);
@@ -294,8 +267,7 @@
                 d.className = 'ci' + (active === c.id ? ' act' : '');
                 const col = COLORS[(c.av||'?').charCodeAt(0)-65]||'#333';
                 d.innerHTML = `<div class="ci-av" style="background:${col}">${c.av}</div><div class="ci-info"><div class="ci-name">${c.name}</div><div class="ci-last">${c.last||''}</div></div>${c.un?'<div class="unread">'+c.un+'</div>':''}<div class="${c.on?'dot-on':'dot-off'}"></div>`;
-                d.onclick = () => open(c.id);
-                el.appendChild(d);
+                d.onclick = () => open(c.id); el.appendChild(d);
             });
         }
 
@@ -320,8 +292,7 @@
                 const d = document.createElement('div');
                 d.className = 'm ' + (m.me ? 'm-me' : 'm-them');
                 const t = new Date(m.time).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-                let h = '';
-                if (m.text) h += m.text;
+                let h = ''; if (m.text) h += m.text;
                 if (m.file) {
                     const f = m.file;
                     if ((f.mime||'').startsWith('image/')) h += '<br><img src="'+f.data+'" onclick="pv(this.src)">';
